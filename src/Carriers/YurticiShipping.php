@@ -48,7 +48,8 @@ class YurticiShipping extends AbstractShipping
         $object->method = 'yurticishipping_standard';
         $object->method_title = $this->getConfigData('title');
         $object->method_description = $this->getConfigData('description');
-        $object->price = $totalShippingCost;
+
+        $object->price = core()->convertPrice($totalShippingCost, 'TRY');
         $object->base_price = $totalShippingCost;
 
         return $object;
@@ -62,13 +63,20 @@ class YurticiShipping extends AbstractShipping
      */
     private function calculateShippingCost(float $chargeableWeight): float
     {
-        if ($chargeableWeight == 0) return 101.5;
-        if ($chargeableWeight >= 1 && $chargeableWeight <= 5) return 135.51;
-        if ($chargeableWeight >= 6 && $chargeableWeight <= 10) return 155.71;
-        if ($chargeableWeight >= 11 && $chargeableWeight <= 15) return 185.95;
-        if ($chargeableWeight >= 16 && $chargeableWeight <= 20) return 255.78;
-        if ($chargeableWeight >= 21 && $chargeableWeight <= 25) return 326.52;
-        if ($chargeableWeight >= 26 && $chargeableWeight <= 30) return 397.57;
-        return 13297;
+        $exchangeRate = core()->getExchangeRate(2)->rate;
+
+        if (!$exchangeRate || $exchangeRate <= 0) {
+            $exchangeRate = 1;
+        }
+
+        if ($chargeableWeight == 0) return 101.5 / $exchangeRate;
+        if ($chargeableWeight >= 1 && $chargeableWeight <= 5) return 135.51 / $exchangeRate;
+        if ($chargeableWeight >= 6 && $chargeableWeight <= 10) return 155.71 / $exchangeRate;
+        if ($chargeableWeight >= 11 && $chargeableWeight <= 15) return 185.95 / $exchangeRate;
+        if ($chargeableWeight >= 16 && $chargeableWeight <= 20) return 255.78 / $exchangeRate;
+        if ($chargeableWeight >= 21 && $chargeableWeight <= 25) return 326.52 / $exchangeRate;
+        if ($chargeableWeight >= 26 && $chargeableWeight <= 30) return 397.57 / $exchangeRate;
+
+        return 13297 / $exchangeRate;
     }
 }
