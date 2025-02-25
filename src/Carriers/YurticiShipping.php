@@ -26,7 +26,7 @@ class YurticiShipping extends AbstractShipping
             return false;
         }
 
-        $totalChargeableWeight = 0;
+        $totalShippingCost = 0;
 
         foreach (Cart::getCart()->items as $item) {
             $height = $item->product->height ?? 1;
@@ -35,13 +35,12 @@ class YurticiShipping extends AbstractShipping
             $weight = $item->product->weight ?? 1;
 
             $volumetricWeight = ($width * $height * $length) / 3000;
-
             $chargeableWeight = max($weight, $volumetricWeight);
 
-            $totalChargeableWeight += $chargeableWeight;
-        }
+            $itemShippingCost = $this->calculateShippingCost($chargeableWeight) * $item->quantity;
 
-        $shippingCost = $this->calculateShippingCost($totalChargeableWeight);
+            $totalShippingCost += $itemShippingCost;
+        }
 
         $object = new CartShippingRate;
         $object->carrier = 'yurticishipping';
@@ -49,8 +48,8 @@ class YurticiShipping extends AbstractShipping
         $object->method = 'yurticishipping_standard';
         $object->method_title = $this->getConfigData('title');
         $object->method_description = $this->getConfigData('description');
-        $object->price = $shippingCost;
-        $object->base_price = $shippingCost;
+        $object->price = $totalShippingCost;
+        $object->base_price = $totalShippingCost;
 
         return $object;
     }
