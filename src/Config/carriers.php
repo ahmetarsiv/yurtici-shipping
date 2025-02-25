@@ -3,10 +3,9 @@
 return [
     'yurticishipping' => [
         'code'         => 'yurticishipping',
-        'title'        => 'YurticiShipping',
-        'description'  => 'YurticiShipping',
+        'title'        => 'Yurtiçi Shipping',
+        'description'  => 'Yurtiçi Shipping',
         'active'       => true,
-        'default_rate' => '10',
         'type'         => 'per_unit',
         'class'        => 'Webkul\YurticiShipping\Carriers\YurticiShipping',
     ],

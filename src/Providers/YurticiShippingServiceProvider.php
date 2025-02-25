@@ -11,7 +11,7 @@ class YurticiShippingServiceProvider extends ServiceProvider
      *
      * @return void
      */
-    public function boot()
+    public function boot(): void
     {
         $this->loadTranslationsFrom(__DIR__.'/../Resources/lang', 'yurticishipping');
     }
