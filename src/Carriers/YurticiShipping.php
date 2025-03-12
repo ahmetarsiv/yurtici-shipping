@@ -89,7 +89,7 @@ class YurticiShipping extends AbstractShipping
     private function fetchProductData(string $sku): array
     {
         try {
-            $response = Http::get("http://localhost:8000/api/v1/products", [
+            $response = Http::get(env('APP_URL') . '/api/v1/products', [
                 'sku' => $sku
             ]);
 
