@@ -58,4 +58,4 @@ php artisan optimize
 > That's it, now just execute the project on your specified domain.
 
 ## How to contribute
-Yurtiçi Shipping is always open for direct contributions. Contributions can be in the form of design suggestions, documentation improvements, new component suggestions, code improvements, adding new features or fixing problems. For more information please check our [Contribution Guideline document.](https://github.com/codenteq/yurtici-shipping/blob/master/CONTRIBUTING.md)
+Yurtiçi Shipping is always open for direct contributions. Contributions can be in the form of design suggestions, documentation improvements, new component suggestions, code improvements, adding new features or fixing problems. For more information please check our [Contribution Guideline document.](https://codenteq.com/contributor-covenant-code-of-conduct/)
