@@ -31,6 +31,9 @@
         "issues": "https://github.com/codenteq/yurtici-shipping/issues",
         "email": "info@codenteq.com"
     },
+    "require": {
+        "bagisto/rest-api": "^2.3"
+    },
     "funding": [
         {
             "type": "github",

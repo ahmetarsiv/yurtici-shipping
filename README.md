@@ -33,8 +33,7 @@ php artisan optimize
 
 ## Installation without composer:
 
-- Unzip the respective extension zip and then merge "packages" and "storage" folders into project root directory.
-- Goto config/app.php file and add following line under 'providers'
+- To ensure that your custom shipping method package is properly integrated into the Bagisto application, you need to register your service provider. This can be done by adding it to the `bootstrap/providers.php` file in the Bagisto root directory.
 
 ```
 Webkul\YurticiShipping\Providers\YurticiShippingServiceProvider::class,
