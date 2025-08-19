@@ -17,138 +17,155 @@ class YurticiShipping extends AbstractShipping
     protected $code = 'yurticishipping';
 
     /**
-     * Returns rate for shipping method
+     * Calculate shipping rates for the cart
      *
      * @return CartShippingRate|false
      */
     public function calculate(): false|CartShippingRate
     {
-        if (! $this->isAvailable()) {
+        if (!$this->isAvailable()) {
             return false;
         }
 
-        $totalShippingCost = $this->calculateTotalShippingCost();
+        $totalCost = collect(Cart::getCart()->items)
+            ->sum(fn($item) => $this->calculateShippingCost($this->getChargeableWeight($item)) * $item->quantity);
 
-        return $this->createShippingRateObject($totalShippingCost);
+        return $this->createShippingRateObject($totalCost);
     }
 
     /**
-     * Calculates total shipping cost for cart items
+     * Calculate chargeable weight for an item (weight vs volumetric weight)
      *
-     * @return float
-     */
-    private function calculateTotalShippingCost(): float
-    {
-        $totalShippingCost = 0;
-
-        foreach (Cart::getCart()->items as $item) {
-            $chargeableWeight = $this->getChargeableWeight($item);
-            $totalShippingCost += $this->calculateShippingCost($chargeableWeight) * $item->quantity;
-        }
-
-        return $totalShippingCost;
-    }
-
-    /**
-     * Determines chargeable weight of an item
-     *
-     * @param object $item
-     * @return float
+     * @param object $item Cart item
+     * @return float Chargeable weight in kg
      */
     private function getChargeableWeight(object $item): float
     {
         $product = $item->product;
-        $productType = $product->type ?? 'simple';
+        $dimensions = $this->getProductDimensions($product, $item);
 
-        if ($productType === 'configurable') {
-            $productData = $this->fetchProductData($product->sku);
-            $variant = $productData[0]['variants'][0] ?? null;
+        $volumetricWeight = ($dimensions['width'] * $dimensions['height'] * $dimensions['length']) / 3000;
 
-            $height = $variant['height'] ?? $product->height ?? 1;
-            $width = $variant['width'] ?? $product->width ?? 1;
-            $length = $variant['length'] ?? $product->length ?? 1;
-            $weight = $variant['weight'] ?? $product->weight ?? 1;
-        } else {
-            $height = $product->height ?? 1;
-            $width = $product->width ?? 1;
-            $length = $product->length ?? 1;
-            $weight = $product->weight ?? 1;
-        }
-
-        $volumetricWeight = ($width * $height * $length) / 3000;
-
-        return max($weight, $volumetricWeight);
+        return max($dimensions['weight'], $volumetricWeight);
     }
 
     /**
-     * Fetch product data from API
+     * Get product dimensions (height, width, length, weight)
+     * Handles both simple and configurable products with API fallback
      *
-     * @param string $sku
-     * @return array
+     * @param object $product Product object
+     * @param object $item Cart item object
+     * @return array Dimensions array with defaults
      */
-    private function fetchProductData(string $sku): array
+    private function getProductDimensions(object $product, object $item): array
+    {
+        $defaults = ['height' => 1, 'width' => 1, 'length' => 1, 'weight' => 1];
+
+        if ($product->type !== 'configurable') {
+            return array_merge($defaults, array_filter([
+                'height' => $product->height,
+                'width' => $product->width,
+                'length' => $product->length,
+                'weight' => $product->weight
+            ]));
+        }
+
+        $productData = $this->fetchProductData($product->id);
+
+        if (empty($productData)) {
+            \Log::warning("404 Not Found Product ID: {$product->id}");
+            return array_merge($defaults, array_filter([
+                'height' => $product->height,
+                'width' => $product->width,
+                'length' => $product->length,
+                'weight' => $product->weight
+            ]));
+        }
+
+        $variant = collect($productData['variants'] ?? [])
+            ->firstWhere('id', $item->child->product_id ?? null);
+
+        return array_merge($defaults, array_filter([
+            'height' => $variant['height'] ?? $product->height,
+            'width' => $variant['width'] ?? $product->width,
+            'length' => $variant['length'] ?? $product->length,
+            'weight' => $variant['weight'] ?? $product->weight
+        ]));
+    }
+
+    /**
+     * Fetch product data from API including variants
+     *
+     * @param int $productId Product ID
+     * @return array Product data from API or empty array on failure
+     */
+    private function fetchProductData(int $productId): array
     {
         try {
-            $response = Http::withOptions(['verify' => false])->get(env('APP_URL') . '/api/v1/products', [
-                'sku' => $sku
-            ]);
+            $response = Http::withOptions(['verify' => false])
+                ->get(env('APP_URL') . "/api/v1/products/{$productId}");
 
-            if ($response->successful()) {
-                return $response->json()['data'] ?? [];
-            }
+            return $response->successful() ? ($response->json()['data'] ?? []) : [];
         } catch (\Exception $e) {
             \Log::error($e->getMessage());
+            return [];
         }
-
-        return [];
     }
 
     /**
-     * Creates a shipping rate object
+     * Create shipping rate object with calculated prices
      *
-     * @param float $totalShippingCost
-     * @return CartShippingRate
+     * @param float $totalCost Total shipping cost in base currency
+     * @return CartShippingRate Configured shipping rate object
      */
-    private function createShippingRateObject(float $totalShippingCost): CartShippingRate
+    private function createShippingRateObject(float $totalCost): CartShippingRate
     {
-        $object = new CartShippingRate;
-        $object->carrier = 'yurticishipping';
-        $object->carrier_title = $this->getConfigData('title');
-        $object->method = 'yurticishipping_standard';
-        $object->method_title = $this->getConfigData('title');
-        $object->method_description = $this->getConfigData('description');
-
-        $object->price = core()->convertPrice($totalShippingCost, 'TRY');
-        $object->base_price = $totalShippingCost;
-
-        return $object;
+        return tap(new CartShippingRate, function($rate) use ($totalCost) {
+            $rate->carrier = 'yurticishipping';
+            $rate->carrier_title = $this->getConfigData('title');
+            $rate->method = 'yurticishipping_standard';
+            $rate->method_title = $this->getConfigData('title');
+            $rate->method_description = $this->getConfigData('description');
+            $rate->price = core()->convertPrice($totalCost, 'TRY');
+            $rate->base_price = $totalCost;
+        });
     }
 
     /**
-     * Determines shipping cost based on chargeable weight
+     * Calculate shipping cost based on weight tiers
      *
-     * @param float $chargeableWeight
-     * @return float
+     * @param float $weight Chargeable weight in kg
+     * @return float Shipping cost in current currency
      */
-    private function calculateShippingCost(float $chargeableWeight): float
+    private function calculateShippingCost(float $weight): float
     {
-        $currentCurreny = core()->getCurrentCurrency()->id;
-        $exchangeRateData = core()->getExchangeRate($currentCurreny);
-        $exchangeRate = $exchangeRateData ? ($exchangeRateData->rate ?? 1) : 1;
+        $exchangeRate = $this->getExchangeRate();
 
-        if ($exchangeRate <= 0) {
-            $exchangeRate = 1;
-        }
-
-        return match (true) {
-            $chargeableWeight == 0 => 101.5 / $exchangeRate,
-            $chargeableWeight <= 5 => 135.51 / $exchangeRate,
-            $chargeableWeight <= 10 => 155.71 / $exchangeRate,
-            $chargeableWeight <= 15 => 185.95 / $exchangeRate,
-            $chargeableWeight <= 20 => 255.78 / $exchangeRate,
-            $chargeableWeight <= 25 => 326.52 / $exchangeRate,
-            $chargeableWeight <= 30 => 397.57 / $exchangeRate,
-            default => 13297 / $exchangeRate,
+        $cost = match (true) {
+            $weight == 0 => 101.5,
+            $weight <= 5 => 135.51,
+            $weight <= 10 => 155.71,
+            $weight <= 15 => 185.95,
+            $weight <= 20 => 255.78,
+            $weight <= 25 => 326.52,
+            $weight <= 30 => 397.57,
+            default => $weight * 13.297,
         };
+
+        return $cost / $exchangeRate;
+    }
+
+    /**
+     * Get current currency exchange rate with fallback to 1
+     *
+     * @return float Exchange rate (always positive)
+     */
+    private function getExchangeRate(): float
+    {
+        $currentCurrency = core()->getCurrentCurrency()->id;
+        $exchangeRateData = core()->getExchangeRate($currentCurrency);
+        $rate = $exchangeRateData->rate ?? 1;
+
+        return $rate > 0 ? $rate : 1;
     }
 }
